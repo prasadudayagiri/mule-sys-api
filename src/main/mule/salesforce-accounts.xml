@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="0919545a-8299-422f-b73d-50ae7a28cc2f" >
+		<http:listener-connection host="0.0.0.0" port="8087" />
+	</http:listener-config>
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="cfb70643-8abf-4c24-b8fb-ac95e522eb15" >
+		<salesforce:basic-connection username="prasad.udayagiri@outlook.com" password="Udgprasad@333" securityToken="Hag5fCC00QoJCFmj0Vn9in83" />
+	</salesforce:sfdc-config>
+	<flow name="salesforce-accountsFlow" doc:id="94e0600d-fc19-4082-a1d0-676ffacb7cae" >
+		<http:listener doc:name="Listener" doc:id="8076b88b-d69b-4855-8bd7-64f79cd2c53a" config-ref="HTTP_Listener_config" path="/account"/>
+		<salesforce:query-all doc:name="Query all" doc:id="b13b0a43-87a9-45f0-a51f-f8f2286cfcdf" config-ref="Salesforce_Config">
+			<salesforce:salesforce-query >SELECT AccountNumber,AccountSource,Active__c,BillingAddress FROM Account</salesforce:salesforce-query>
+		</salesforce:query-all>
+		<ee:transform doc:name="Transform Message" doc:id="f6db0993-0635-4135-ae45-4b25a4d83670" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="22155d7b-3dfd-4c17-8f7b-ab3f2df16059" message="#[payload]" />
+	</flow>
+	<flow name="salesforce-accountsFlow1" doc:id="3d78cbad-3cf9-487c-8652-e389e37bc5d4" >
+		<http:listener doc:name="Listener" doc:id="d4317778-9a9d-4f79-bdc4-da9484df0e1b" config-ref="HTTP_Listener_config" path="/upsert"/>
+		<ee:transform doc:name="Transform Message" doc:id="8b850f18-043d-4066-b552-7726755bd20f" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[{
+LastName: payload.last_name,
+FirstName: payload.first_name,
+Phone: payload.Phone,
+Email: payload.personal_email
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:upsert doc:name="Upsert" doc:id="2dcba791-5ee6-4720-a709-55114baea7ce" config-ref="Salesforce_Config" externalIdFieldName="Email" type="Contact"/>
+		<ee:transform doc:name="Transform Message" doc:id="05d95f71-6851-4bf7-95aa-239053762632" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    id: payload[0].id,
+    success: payload[0].success
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+	<flow name="salesforce-accountsFlow2" doc:id="6706cd0c-ce1e-4c18-b90b-dcfa09903ca1" >
+		<http:listener doc:name="Listener" doc:id="a2a3109a-d6d3-4121-8f70-beff1a724793" config-ref="HTTP_Listener_config" path="/create"/>
+		<ee:transform doc:name="Transform Message" doc:id="c61256e0-27dc-413e-b238-9f6e8bf90da5" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/java
+---
+[
+{
+	"Amount__c":payload.amount,
+	"InvocieId__c":payload.invocieid	
+}
+]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<salesforce:create doc:name="Create" doc:id="df9ad3e1-35de-4f40-8ea8-c962f12d355d" config-ref="Salesforce_Config" type="Invoice__c"/>
+	</flow>
+</mule>
